@@ -1,32 +1,116 @@
 import math
+import os
 
-# To run this script use command: python pathToScript outputPath imageData
 
-path = r'D:\Desktop\test.bmp'
-data = b'''
-\xff\xff\xff\x00\x00\x00\xff\xff\xff
-\xff\xff\xff\x00\x00\x00\xff\xff\xff
-\xff\xff\xff\x00\x00\x00\xff\xff\xff
-\xff\xff\xff\x00\x00\x00\xff\xff\xff
-'''
+class BMP:
+    HEADER_SIZE = 54
+
+    def __init__(self, array_size, width, height):
+        self.headers = self.bitmap_header(array_size) + self.dib_header(array_size, width, height)
+
+    @staticmethod
+    def bitmap_header(array_size):
+        # Overall size 14 bytes
+        headers = bytearray()
+
+        headers.extend(b'BM')  # Starting constant
+        headers.extend(array_size.to_bytes(4, byteorder='little'))  # size of the BMP file in bytes
+        headers.extend(bytes(4))  # reserved
+        headers.extend(BMP.HEADER_SIZE.to_bytes(4, byteorder='little'))  # offset of first byte with bitmap image data
+        return headers
+
+    @staticmethod
+    def dib_header(array_size, width, height):
+        # Overall size 40 bytes
+        headers = bytearray()
+
+        headers.extend((40).to_bytes(4, byteorder='little'))  # the size of this header, in bytes (40)
+        headers.extend(width.to_bytes(4, byteorder='little'))  # the bitmap width in pixels
+        headers.extend(height.to_bytes(4, byteorder='little'))  # the bitmap height in pixels
+        headers.extend((1).to_bytes(2, byteorder='little'))  # the number of color planes (must be 1)
+        headers.extend((24).to_bytes(2, byteorder='little'))  # the number of bits per pixel
+        headers.extend(bytes(4))  # the compression method being used
+        headers.extend((array_size - BMP.HEADER_SIZE).to_bytes(4, byteorder='little'))  # the image size
+        headers.extend(bytes(4))  # the horizontal resolution of the image, used for printer - omitted
+        headers.extend(bytes(4))  # the vertical resolution of the image, used for printer - omitted
+        headers.extend(bytes(4))  # the number of colors in the color palette, or 0 to default to 2n
+        headers.extend(bytes(4))  # the number of important colors used, or 0 when every color is important
+        return headers
+
+    @staticmethod
+    def space(data_amount):
+        if data_amount % 12 == 0:
+            return data_amount
+        return data_amount + (4 - (data_amount % 4))
+
+
+class Rectangle:
+    def __init__(self, sides_ratio, needed_space):
+        self.sides_ratio = sides_ratio
+        self.width = None
+        self.height = None
+        self.set_width_and_height(needed_space)
+
+    def __iter__(self):
+        return iter((self.width, self.height))
+
+    def set_width_and_height(self, needed_space):
+        height = math.sqrt(needed_space / self.sides_ratio)
+        self.width = math.ceil(height * self.sides_ratio)
+        self.height = math.ceil(height)
 
 
 class Image:
-    def __init__(self, path, height, data):
-        self.path = path
-        self.neededSpace = self.space(data)
-        self.height = height
-        self.width = self.neededSpace // 4
-        self.data = self.appendData(data)
+    def __init__(self, data, sides_ratio=None):
+        self.data = data
+        self.sides_ratio = sides_ratio
+        self.rectangle = None
+        self.string_space = self.calculate_string_space()
+        self.needed_space = BMP.HEADER_SIZE + self.string_space
+        self.overall_space = self.calculate_overall_space()
+        self.padding_space = self.calculate_padding()
 
+    def create_rectangle_object(self):
+        # TODO is there not a better solution?
+        self.rectangle = Rectangle(self.sides_ratio, self.needed_space)
+        return self.rectangle
 
-    def space(self, data):
-        dataLength = len(data)
-        return dataLength + (4 - (dataLength % 4))
+    def calculate_string_space(self):
+        if not self.sides_ratio:
+            return BMP.space(len(self.data))
+        return len(self.data)
 
-    def appendData(self, data):
-        data += bytes(self.neededSpace - len(self.data))
-        return data
+    def calculate_overall_space(self):
+        """
+        Calculates combined taken space by headers and input data. I
+        """
+        if not self.sides_ratio:
+            return BMP.HEADER_SIZE + self.string_space
+
+        width, height = self.create_rectangle_object().__iter__()
+        return BMP.space(3*width) * height
+
+    def calculate_padding(self):
+        if not self.sides_ratio:
+            return self.string_space - len(self.data)
+        return self.overall_space - self.string_space
+
+    def write(self, name, specified_path=None):
+
+        name = f"{name}.bmp" if not name.endswith(".bmp") else name
+        # TODO path in else statement could use relative path (name only)
+        path = os.path.join(specified_path, name) if specified_path else os.path.join(os.getcwd(), name)
+
+        if not self.sides_ratio:
+            bmp_data = BMP(self.overall_space, self.string_space//4, 1)
+        else:
+            # TODO fix here so that BMP.HEADER_SIZE doesn't have to be here
+            bmp_data = BMP(BMP.HEADER_SIZE + self.overall_space, self.rectangle.width, self.rectangle.height)
+
+        image_data = bmp_data.headers + self.data + bytes(self.padding_space)
+
+        with open(path, 'wb') as f:
+            f.write(image_data)
 
 
 def calculateNeededSpace(amount):
@@ -34,27 +118,26 @@ def calculateNeededSpace(amount):
         return amount
     return amount + (4 - (amount % 4))
 
+def rectangle(data, sidesRatio):
 
-sidesRatio = 4/3
+    space = calculateNeededSpace(len(data))
 
-space = calculateNeededSpace(len(data))
+    height = math.sqrt(space / sidesRatio)
+    width = math.ceil(height * sidesRatio)
+    height = math.ceil(height)
 
-height = math.sqrt(space / sidesRatio)
-width = math.ceil(height * sidesRatio)
-height = math.ceil(height)
+    space = calculateNeededSpace(3*width)*height
 
-space = calculateNeededSpace(width*height)
+    missingBytes = space - len(data)
+    print(len(data), space, missingBytes)
 
-numberOfBytes = 3 * width
-missingBytes = height * (calculateNeededSpace(numberOfBytes) - numberOfBytes)
+    data += bytes(missingBytes)
 
-data += bytes(missingBytes)
-
-imgData = bytearray()
+    with open('right.bmp', 'wb') as f:
+        f.write(BMP(54+len(data), width, height).headers+data)
 
 
-def line():
-    imageHeight = 1
+def line(data):
 
     dataLength = len(data)
     spaceForString = dataLength + (4 - (dataLength % 4))
@@ -62,35 +145,89 @@ def line():
     data += bytes(spaceForString - dataLength)
 
     imageWidth = spaceForString // 4
-    rowSize = math.ceil((24 * imageWidth) / 32) * 4
-    pixelArraySize = rowSize * imageHeight - 250
 
+    with open('right.bmp', 'wb') as f:
+        f.write(BMP(54+len(data), imageWidth, 1).headers+data)
 
-def bitmapHeaders():
-    # Bitmap file headers
-    imgData.extend(b'BM')  # Starting constant
-    imgData.extend((pixelArraySize + 54).to_bytes(4, byteorder='little'))  # size of the BMP file in bytes
-    imgData.extend(bytes(4))  # reserved
-    imgData.extend((54).to_bytes(4, byteorder='little'))  # offset of first byte with bitmap image data
+def test():
+    with open('test.bmp', 'rb') as f:
+        mine = f.read()
 
-def DIBHeaders():
-    # DIB headers
-    imgData.extend((40).to_bytes(4, byteorder='little'))  # the size of this header, in bytes (40)
-    imgData.extend(imageWidth.to_bytes(4, byteorder='little'))  # the bitmap width in pixels
-    imgData.extend(imageHeight.to_bytes(4, byteorder='little'))  # the bitmap height in pixels
-    imgData.extend((1).to_bytes(2, byteorder='little'))  # the number of color planes (must be 1)
-    imgData.extend((24).to_bytes(2, byteorder='little'))  # the number of bits per pixel
-    imgData.extend(bytes(4))  # the compression method being used
-    imgData.extend(pixelArraySize.to_bytes(4, byteorder='little'))  # the image size
-    imgData.extend(bytes(4))  # the horizontal resolution of the image, may need to be changed (same for the lower one)?
-    imgData.extend(bytes(4))  # the vertical resolution of the image
-    imgData.extend(bytes(4))  # the number of colors in the color palette, or 0 to default to 2n
-    imgData.extend(bytes(4))  # the number of important colors used, or 0 when every color is important
+    with open('right.bmp', 'rb') as f:
+        right = f.read()
 
+    diffs = []
+    for i, (a, b) in enumerate(zip(mine, right)):
+        if a != b:
+            diffs.append(i)
 
-# if __name__ == '__main__':
-#     bitmapHeaders()
-#     DIBHeaders()
-#     imgData.extend(data)
-#     with open(path, 'wb') as f:
-#         f.write(imgData)
+    print(f"""{mine}
+{right}
+{diffs}""")
+
+if __name__ == '__main__':
+    user_path = r'D:\Desktop\test.bmp'
+    user_input = b'''
+                           _,,ad8888888888bba,_
+                        ,ad88888I888888888888888ba,
+                      ,88888888I88888888888888888888a,
+                    ,d888888888I8888888888888888888888b,
+                   d88888PP"""" ""YY88888888888888888888b,
+                 ,d88"'__,,--------,,,,.;ZZZY8888888888888,
+                ,8IIl'"                ;;l"ZZZIII8888888888,
+               ,I88l;'                  ;lZZZZZ888III8888888,
+             ,II88Zl;.                  ;llZZZZZ888888I888888,
+            ,II888Zl;.                .;;;;;lllZZZ888888I8888b
+           ,II8888Z;;                 `;;;;;''llZZ8888888I8888,
+           II88888Z;'                        .;lZZZ8888888I888b
+           II88888Z; _,aaa,      .,aaaaa,__.l;llZZZ88888888I888
+           II88888IZZZZZZZZZ,  .ZZZZZZZZZZZZZZ;llZZ88888888I888,
+           II88888IZZ<'(@@>Z|  |ZZZ<'(@@>ZZZZ;;llZZ888888888I88I
+          ,II88888;   `""" ;|  |ZZ; `"""     ;;llZ8888888888I888
+          II888888l            `;;          .;llZZ8888888888I888,
+         ,II888888Z;           ;;;        .;;llZZZ8888888888I888I
+         III888888Zl;    ..,   `;;       ,;;lllZZZ88888888888I888
+         II88888888Z;;...;(_    _)      ,;;;llZZZZ88888888888I888,
+         II88888888Zl;;;;;' `--'Z;.   .,;;;;llZZZZ88888888888I888b
+         ]I888888888Z;;;;'   ";llllll;..;;;lllZZZZ88888888888I8888,
+         II888888888Zl.;;"Y88bd888P";;,..;lllZZZZZ88888888888I8888I
+         II8888888888Zl;.; `"PPP";;;,..;lllZZZZZZZ88888888888I88888
+         II888888888888Zl;;. `;;;l;;;;lllZZZZZZZZW88888888888I88888
+         `II8888888888888Zl;.    ,;;lllZZZZZZZZWMZ88888888888I88888
+          II8888888888888888ZbaalllZZZZZZZZZWWMZZZ8888888888I888888,
+          `II88888888888888888b"WWZZZZZWWWMMZZZZZZI888888888I888888b
+           `II88888888888888888;ZZMMMMMMZZZZZZZZllI888888888I8888888
+            `II8888888888888888 `;lZZZZZZZZZZZlllll888888888I8888888,
+             II8888888888888888, `;lllZZZZllllll;;.Y88888888I8888888b,
+            ,II8888888888888888b   .;;lllllll;;;.;..88888888I88888888b,
+            II888888888888888PZI;.  .`;;;.;;;..; ...88888888I8888888888,
+            II888888888888PZ;;';;.   ;. .;.  .;. .. Y8888888I88888888888b,
+           ,II888888888PZ;;'                        `8888888I8888888888888b,
+           II888888888'                              888888I8888888888888888b
+          ,II888888888                              ,888888I88888888888888888
+         ,d88888888888                              d888888I8888888888ZZZZZZZ
+      ,ad888888888888I                              8888888I8888ZZZZZZZZZZZZZ
+    ,d888888888888888'                              888888IZZZZZZZZZZZZZZZZZZ
+  ,d888888888888P'8P'                               Y888ZZZZZZZZZZZZZZZZZZZZZ
+ ,8888888888888,  "                                 ,ZZZZZZZZZZZZZZZZZZZZZZZZ
+d888888888888888,                                ,ZZZZZZZZZZZZZZZZZZZZZZZZZZZ
+888888888888888888a,      _                    ,ZZZZZZZZZZZZZZZZZZZZ888888888
+888888888888888888888ba,_d'                  ,ZZZZZZZZZZZZZZZZZ88888888888888
+8888888888888888888888888888bbbaaa,,,______,ZZZZZZZZZZZZZZZ888888888888888888
+88888888888888888888888888888888888888888ZZZZZZZZZZZZZZZ888888888888888888888
+8888888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888
+888888888888888888888888888888888888888ZZZZZZZZZZZZZZ888888888888888888888888
+8888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888
+88888888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888888888888
+8888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888 Normand  88
+88888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888 Veilleux 88
+8888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888888888
+    '''
+    sides_ratio = None
+    img = Image(user_input, sides_ratio)
+    if not sides_ratio:
+        line(user_input)
+    else:
+        rectangle(user_input, sides_ratio)
+    img.write("test")
+    test()
