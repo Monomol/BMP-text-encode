@@ -11,7 +11,7 @@ class BMP:
 
     @staticmethod
     def bitmap_header(array_size):
-        # Overall size 14 bytes
+        # Overall size of 14 bytes
         header = bytearray()
 
         header.extend(b'BM')  # Starting constant
@@ -22,7 +22,7 @@ class BMP:
 
     @staticmethod
     def dib_header(array_size, width, height):
-        # Overall size 40 bytes
+        # Overall size of 40 bytes
         header = bytearray()
 
         header.extend((40).to_bytes(4, byteorder='little'))  # the size of this header, in bytes (40)
