@@ -1,5 +1,5 @@
 import math
-
+import os
 
 class BMP:
     HEADER_SIZE = 54
@@ -58,7 +58,7 @@ def rectangle(data, sidesRatio):
 
     data += bytes(missingBytes)
 
-    with open('test_files/right.bmp', 'wb') as f:
+    with open('test_files/rectangle_right.bmp', 'wb') as f:
         f.write(BMP(54+len(data), width, height).headers+data)
 
 
@@ -71,25 +71,34 @@ def line(data):
 
     imageWidth = spaceForString // 4
 
-    with open('test_files/right.bmp', 'wb') as f:
+    with open('test_files/line_right.bmp', 'wb') as f:
         f.write(BMP(54+len(data), imageWidth, 1).headers+data)
 
 
-def compare():
-    with open('test_files/test.bmp', 'rb') as f:
-        mine = f.read()
+def compare_rectangle():
+    with open('test_files/rectangle_test.bmp', 'rb') as f:
+        tested_rectangle = f.read()
 
-    with open('test_files/right.bmp', 'rb') as f:
-        right = f.read()
+    with open('test_files/rectangle_right.bmp', 'rb') as f:
+        rectangle_right = f.read()
 
     diffs = []
-    for i, (a, b) in enumerate(zip(mine, right)):
+    for i, (a, b) in enumerate(zip(tested_rectangle, rectangle_right)):
         if a != b:
             diffs.append(i)
 
-    print(f"""{mine}
-{right}
-{diffs}""")
+
+def compare_line():
+    with open('test_files/line_test.bmp', 'rb') as f:
+        tested_line = f.read()
+
+    with open('test_files/line_right.bmp', 'rb') as f:
+        line_right = f.read()
+
+    diffs = []
+    for i, (a, b) in enumerate(zip(tested_line, line_right)):
+        if a != b:
+            diffs.append(i)
 
 
 if __name__ == '__main__':
@@ -135,10 +144,14 @@ if __name__ == '__main__':
 
     '''
     sides_ratio = 1
-    img = testedFile.Image(user_input, sides_ratio)
+
+    if not os.path.isdir("test_files"):
+        os.mkdir("test_files")
+
     if not sides_ratio:
         line(user_input)
     else:
         rectangle(user_input, sides_ratio)
-    img.write("test")
-    compare()
+    compare_line()
+    compare_rectangle()
+    # Not in a working state
