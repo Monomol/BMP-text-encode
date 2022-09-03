@@ -1,6 +1,7 @@
 import math
 import os
 
+# TODO: implement random bytes selection instead of just appending \x00 bytes
 
 class BMP:
     HEADER_SIZE = 54
@@ -65,7 +66,7 @@ class Image:
         self.data = data
         self.sides_ratio = sides_ratio
         self.rectangle = None
-        # TODO this a naming disaster, needs to be refactored
+        # TODO this is a naming disaster, needs to be refactored
         self.string_space = self.calculate_string_space()
         self.needed_space = BMP.HEADER_SIZE + self.string_space
         self.overall_space = self.calculate_overall_space()
