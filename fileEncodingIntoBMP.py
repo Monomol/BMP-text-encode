@@ -11,31 +11,31 @@ class BMP:
     @staticmethod
     def bitmap_header(array_size):
         # Overall size 14 bytes
-        headers = bytearray()
+        header = bytearray()
 
-        headers.extend(b'BM')  # Starting constant
-        headers.extend(array_size.to_bytes(4, byteorder='little'))  # size of the BMP file in bytes
-        headers.extend(bytes(4))  # reserved
-        headers.extend(BMP.HEADER_SIZE.to_bytes(4, byteorder='little'))  # offset of first byte with bitmap image data
-        return headers
+        header.extend(b'BM')  # Starting constant
+        header.extend(array_size.to_bytes(4, byteorder='little'))  # size of the BMP file in bytes
+        header.extend(bytes(4))  # reserved
+        header.extend(BMP.HEADER_SIZE.to_bytes(4, byteorder='little'))  # offset of first byte with bitmap image data
+        return header
 
     @staticmethod
     def dib_header(array_size, width, height):
         # Overall size 40 bytes
-        headers = bytearray()
+        header = bytearray()
 
-        headers.extend((40).to_bytes(4, byteorder='little'))  # the size of this header, in bytes (40)
-        headers.extend(width.to_bytes(4, byteorder='little'))  # the bitmap width in pixels
-        headers.extend(height.to_bytes(4, byteorder='little'))  # the bitmap height in pixels
-        headers.extend((1).to_bytes(2, byteorder='little'))  # the number of color planes (must be 1)
-        headers.extend((24).to_bytes(2, byteorder='little'))  # the number of bits per pixel
-        headers.extend(bytes(4))  # the compression method being used
-        headers.extend((array_size - BMP.HEADER_SIZE).to_bytes(4, byteorder='little'))  # the image size
-        headers.extend(bytes(4))  # the horizontal resolution of the image, used for printer - omitted
-        headers.extend(bytes(4))  # the vertical resolution of the image, used for printer - omitted
-        headers.extend(bytes(4))  # the number of colors in the color palette, or 0 to default to 2n
-        headers.extend(bytes(4))  # the number of important colors used, or 0 when every color is important
-        return headers
+        header.extend((40).to_bytes(4, byteorder='little'))  # the size of this header, in bytes (40)
+        header.extend(width.to_bytes(4, byteorder='little'))  # the bitmap width in pixels
+        header.extend(height.to_bytes(4, byteorder='little'))  # the bitmap height in pixels
+        header.extend((1).to_bytes(2, byteorder='little'))  # the number of color planes (must be 1)
+        header.extend((24).to_bytes(2, byteorder='little'))  # the number of bits per pixel
+        header.extend(bytes(4))  # the compression method being used
+        header.extend((array_size - BMP.HEADER_SIZE).to_bytes(4, byteorder='little'))  # the image size
+        header.extend(bytes(4))  # the horizontal resolution of the image, used for printer - omitted
+        header.extend(bytes(4))  # the vertical resolution of the image, used for printer - omitted
+        header.extend(bytes(4))  # the number of colors in the color palette, or 0 to default to 2n
+        header.extend(bytes(4))  # the number of important colors used, or 0 when every color is important
+        return header
 
     @staticmethod
     def space(data_amount):
@@ -65,6 +65,7 @@ class Image:
         self.data = data
         self.sides_ratio = sides_ratio
         self.rectangle = None
+        # TODO this a naming disaster, needs to be refactored
         self.string_space = self.calculate_string_space()
         self.needed_space = BMP.HEADER_SIZE + self.string_space
         self.overall_space = self.calculate_overall_space()
@@ -82,7 +83,8 @@ class Image:
 
     def calculate_overall_space(self):
         """
-        Calculates combined taken space by headers and input data. I
+        Calculates combined taken space by headers, input data, and padding.
+        If the outputted shape is a line it is equal to the variable self.needed_space.
         """
         if not self.sides_ratio:
             return BMP.HEADER_SIZE + self.string_space
@@ -98,8 +100,8 @@ class Image:
     def write(self, name, specified_path=None):
 
         name = f"{name}.bmp" if not name.endswith(".bmp") else name
-        # TODO path in else statement could use relative path (name only)
-        path = os.path.join(specified_path, name) if specified_path else os.path.join(os.getcwd(), name)
+        # TODO when in final form test if else statement doesn't have to use os.getcwd()
+        path = os.path.join(specified_path, name) if specified_path else name
 
         if not self.sides_ratio:
             bmp_data = BMP(self.overall_space, self.string_space//4, 1)
@@ -113,60 +115,8 @@ class Image:
             f.write(image_data)
 
 
-def calculateNeededSpace(amount):
-    if amount % 12 == 0:
-        return amount
-    return amount + (4 - (amount % 4))
-
-def rectangle(data, sidesRatio):
-
-    space = calculateNeededSpace(len(data))
-
-    height = math.sqrt(space / sidesRatio)
-    width = math.ceil(height * sidesRatio)
-    height = math.ceil(height)
-
-    space = calculateNeededSpace(3*width)*height
-
-    missingBytes = space - len(data)
-    print(len(data), space, missingBytes)
-
-    data += bytes(missingBytes)
-
-    with open('right.bmp', 'wb') as f:
-        f.write(BMP(54+len(data), width, height).headers+data)
-
-
-def line(data):
-
-    dataLength = len(data)
-    spaceForString = dataLength + (4 - (dataLength % 4))
-
-    data += bytes(spaceForString - dataLength)
-
-    imageWidth = spaceForString // 4
-
-    with open('right.bmp', 'wb') as f:
-        f.write(BMP(54+len(data), imageWidth, 1).headers+data)
-
-def test():
-    with open('test.bmp', 'rb') as f:
-        mine = f.read()
-
-    with open('right.bmp', 'rb') as f:
-        right = f.read()
-
-    diffs = []
-    for i, (a, b) in enumerate(zip(mine, right)):
-        if a != b:
-            diffs.append(i)
-
-    print(f"""{mine}
-{right}
-{diffs}""")
-
 if __name__ == '__main__':
-    user_path = r'D:\Desktop\test.bmp'
+    user_path = r'D:\Desktop'
     user_input = b'''
                            _,,ad8888888888bba,_
                         ,ad88888I888888888888888ba,
@@ -205,29 +155,8 @@ if __name__ == '__main__':
            ,II888888888PZ;;'                        `8888888I8888888888888b,
            II888888888'                              888888I8888888888888888b
           ,II888888888                              ,888888I88888888888888888
-         ,d88888888888                              d888888I8888888888ZZZZZZZ
-      ,ad888888888888I                              8888888I8888ZZZZZZZZZZZZZ
-    ,d888888888888888'                              888888IZZZZZZZZZZZZZZZZZZ
-  ,d888888888888P'8P'                               Y888ZZZZZZZZZZZZZZZZZZZZZ
- ,8888888888888,  "                                 ,ZZZZZZZZZZZZZZZZZZZZZZZZ
-d888888888888888,                                ,ZZZZZZZZZZZZZZZZZZZZZZZZZZZ
-888888888888888888a,      _                    ,ZZZZZZZZZZZZZZZZZZZZ888888888
-888888888888888888888ba,_d'                  ,ZZZZZZZZZZZZZZZZZ88888888888888
-8888888888888888888888888888bbbaaa,,,______,ZZZZZZZZZZZZZZZ888888888888888888
-88888888888888888888888888888888888888888ZZZZZZZZZZZZZZZ888888888888888888888
-8888888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888
-888888888888888888888888888888888888888ZZZZZZZZZZZZZZ888888888888888888888888
-8888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888
-88888888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888888888888
-8888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888 Normand  88
-88888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888 Veilleux 88
-8888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888888888
+
     '''
-    sides_ratio = None
+    sides_ratio = 1
     img = Image(user_input, sides_ratio)
-    if not sides_ratio:
-        line(user_input)
-    else:
-        rectangle(user_input, sides_ratio)
-    img.write("test")
-    test()
+    img.write("test", user_path)
