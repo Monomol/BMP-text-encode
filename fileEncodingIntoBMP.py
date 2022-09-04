@@ -1,7 +1,10 @@
 import math
 import os
+import random
 
 # TODO: implement random bytes selection instead of just appending \x00 bytes
+UNPRINTABLE_CHARACTERS = [b'\x00', b'\x02', b'\t', b'\n', b'\r', b'\x1b',
+                          b'\x1c', b'\x1d', b'\x1e', b'\x1f', b' ', b'\xa0']
 
 class BMP:
     HEADER_SIZE = 54
@@ -91,26 +94,50 @@ class Image:
             return BMP.HEADER_SIZE + self.string_space
 
         width, height = self.create_rectangle_object().__iter__()
-        return BMP.space(3*width) * height
+        return BMP.HEADER_SIZE + BMP.space(3*width) * height
 
     def calculate_padding(self):
         if not self.sides_ratio:
             return self.string_space - len(self.data)
         return self.overall_space - self.string_space
 
+    def calculate_chars_ratio(self):
+        characters = {}
+
+        for char in self.data:
+            if char not in characters:
+                characters[char] = 0
+            else:
+                characters[char] += 1
+
+        ratio = {key: occurrences/len(self.data) for key, occurrences in characters.items()}
+        return ratio
+
+    def padding_based_on_chars_ratio(self):
+        characters_ratio = self.calculate_chars_ratio()
+        print(characters_ratio)
+        characters = [key.to_bytes(1, byteorder='little')*int(ratio*self.padding_space)
+                      for key, ratio in characters_ratio.items()]
+        return characters
+
+    def random_padding(self):
+        # TODO: group all possible variants and let user choose
+        # return b''.join(random.choices(UNPRINTABLE_CHARACTERS, k=self.padding_space))
+        # return b''.join([i.to_bytes(1, byteorder='little') for i in random.choices(self.data, k=self.padding_space)])
+        # return b''.join(random.sample(self.padding_based_on_chars_ratio(), k=len(self.padding_based_on_chars_ratio())))
+        return random.randbytes(self.padding_space)
+
     def write(self, name, specified_path=None):
 
         name = f"{name}.bmp" if not name.endswith(".bmp") else name
-        # TODO when in final form test if else statement doesn't have to use os.getcwd()
         path = os.path.join(specified_path, name) if specified_path else name
 
         if not self.sides_ratio:
             bmp_data = BMP(self.overall_space, self.string_space//4, 1)
         else:
-            # TODO fix here so that BMP.HEADER_SIZE doesn't have to be here
-            bmp_data = BMP(BMP.HEADER_SIZE + self.overall_space, self.rectangle.width, self.rectangle.height)
+            bmp_data = BMP(self.overall_space, self.rectangle.width, self.rectangle.height)
 
-        image_data = bmp_data.headers + self.data + bytes(self.padding_space)
+        image_data = bmp_data.headers + self.data + self.random_padding()
 
         with open(path, 'wb') as f:
             f.write(image_data)
@@ -119,6 +146,7 @@ class Image:
 if __name__ == '__main__':
     user_path = r'D:\Desktop'
     user_input = b'''
+                                  _______
                            _,,ad8888888888bba,_
                         ,ad88888I888888888888888ba,
                       ,88888888I88888888888888888888a,
@@ -156,6 +184,23 @@ if __name__ == '__main__':
            ,II888888888PZ;;'                        `8888888I8888888888888b,
            II888888888'                              888888I8888888888888888b
           ,II888888888                              ,888888I88888888888888888
+         ,d88888888888                              d888888I8888888888ZZZZZZZ
+      ,ad888888888888I                              8888888I8888ZZZZZZZZZZZZZ
+    ,d888888888888888'                              888888IZZZZZZZZZZZZZZZZZZ
+  ,d888888888888P'8P'                               Y888ZZZZZZZZZZZZZZZZZZZZZ
+ ,8888888888888,  "                                 ,ZZZZZZZZZZZZZZZZZZZZZZZZ
+d888888888888888,                                ,ZZZZZZZZZZZZZZZZZZZZZZZZZZZ
+888888888888888888a,      _                    ,ZZZZZZZZZZZZZZZZZZZZ888888888
+888888888888888888888ba,_d'                  ,ZZZZZZZZZZZZZZZZZ88888888888888
+8888888888888888888888888888bbbaaa,,,______,ZZZZZZZZZZZZZZZ888888888888888888
+88888888888888888888888888888888888888888ZZZZZZZZZZZZZZZ888888888888888888888
+8888888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888
+888888888888888888888888888888888888888ZZZZZZZZZZZZZZ888888888888888888888888
+8888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888
+88888888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888888888888
+8888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888 Normand  88
+88888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888 Veilleux 88
+8888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888888888
 
     '''
     sides_ratio = 1
