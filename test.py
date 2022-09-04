@@ -1,6 +1,7 @@
 import math
 import os
 
+
 class BMP:
     HEADER_SIZE = 54
 
@@ -43,20 +44,20 @@ class BMP:
         return data_amount + (4 - (data_amount % 4))
 
 
-def rectangle(data, sidesRatio):
+def rectangle(data, sides_ratio):
 
     space = BMP.space(len(data))
 
-    height = math.sqrt(space / sidesRatio)
-    width = math.ceil(height * sidesRatio)
+    height = math.sqrt(space / sides_ratio)
+    width = math.ceil(height * sides_ratio)
     height = math.ceil(height)
 
     space = BMP.space(3*width)*height
 
-    missingBytes = space - len(data)
-    print(len(data), space, missingBytes)
+    missing_bytes = space - len(data)
+    print(len(data), space, missing_bytes)
 
-    data += bytes(missingBytes)
+    data += bytes(missing_bytes)
 
     with open('test_files/rectangle_right.bmp', 'wb') as f:
         f.write(BMP(54+len(data), width, height).headers+data)
@@ -64,39 +65,25 @@ def rectangle(data, sidesRatio):
 
 def line(data):
 
-    dataLength = len(data)
-    spaceForString = dataLength + (4 - (dataLength % 4))
+    string_space = len(data) + (4 - (len(data) % 4))
 
-    data += bytes(spaceForString - dataLength)
+    data += bytes(string_space - len(data))
 
-    imageWidth = spaceForString // 4
+    image_width = string_space // 4
 
     with open('test_files/line_right.bmp', 'wb') as f:
-        f.write(BMP(54+len(data), imageWidth, 1).headers+data)
+        f.write(BMP(54+len(data), image_width, 1).headers+data)
 
 
-def compare_rectangle():
-    with open('test_files/rectangle_test.bmp', 'rb') as f:
-        tested_rectangle = f.read()
+def compare(tested):
+    with open(f'test_files/{tested}_test.bmp', 'rb') as f:
+        tested_object = f.read()
 
-    with open('test_files/rectangle_right.bmp', 'rb') as f:
-        rectangle_right = f.read()
-
-    diffs = []
-    for i, (a, b) in enumerate(zip(tested_rectangle, rectangle_right)):
-        if a != b:
-            diffs.append(i)
-
-
-def compare_line():
-    with open('test_files/line_test.bmp', 'rb') as f:
-        tested_line = f.read()
-
-    with open('test_files/line_right.bmp', 'rb') as f:
-        line_right = f.read()
+    with open(f'test_files/{tested}_right.bmp', 'rb') as f:
+        right_object = f.read()
 
     diffs = []
-    for i, (a, b) in enumerate(zip(tested_line, line_right)):
+    for i, (a, b) in enumerate(zip(tested_object, right_object)):
         if a != b:
             diffs.append(i)
 
@@ -104,6 +91,7 @@ def compare_line():
 if __name__ == '__main__':
     user_path = r'D:\Desktop\test.bmp'
     user_input = b'''
+                                  _______
                            _,,ad8888888888bba,_
                         ,ad88888I888888888888888ba,
                       ,88888888I88888888888888888888a,
@@ -141,6 +129,23 @@ if __name__ == '__main__':
            ,II888888888PZ;;'                        `8888888I8888888888888b,
            II888888888'                              888888I8888888888888888b
           ,II888888888                              ,888888I88888888888888888
+         ,d88888888888                              d888888I8888888888ZZZZZZZ
+      ,ad888888888888I                              8888888I8888ZZZZZZZZZZZZZ
+    ,d888888888888888'                              888888IZZZZZZZZZZZZZZZZZZ
+  ,d888888888888P'8P'                               Y888ZZZZZZZZZZZZZZZZZZZZZ
+ ,8888888888888,  "                                 ,ZZZZZZZZZZZZZZZZZZZZZZZZ
+d888888888888888,                                ,ZZZZZZZZZZZZZZZZZZZZZZZZZZZ
+888888888888888888a,      _                    ,ZZZZZZZZZZZZZZZZZZZZ888888888
+888888888888888888888ba,_d'                  ,ZZZZZZZZZZZZZZZZZ88888888888888
+8888888888888888888888888888bbbaaa,,,______,ZZZZZZZZZZZZZZZ888888888888888888
+88888888888888888888888888888888888888888ZZZZZZZZZZZZZZZ888888888888888888888
+8888888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888
+888888888888888888888888888888888888888ZZZZZZZZZZZZZZ888888888888888888888888
+8888888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888
+88888888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888888888888
+8888888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888 Normand  88
+88888888888888888888888888888888ZZZZZZZZZZZZZZ8888888888888888888 Veilleux 88
+8888888888888888888888888888888ZZZZZZZZZZZZZZ88888888888888888888888888888888
 
     '''
     sides_ratio = 1
@@ -148,10 +153,9 @@ if __name__ == '__main__':
     if not os.path.isdir("test_files"):
         os.mkdir("test_files")
 
-    if not sides_ratio:
-        line(user_input)
-    else:
-        rectangle(user_input, sides_ratio)
-    compare_line()
-    compare_rectangle()
+    line(user_input)
+    compare('line')
+
+    rectangle(user_input, sides_ratio)
+    compare('rectangle')
     # Not in a working state
